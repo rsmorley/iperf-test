@@ -1,0 +1,4 @@
+app/es5
+app/node_modules
+
+*.swp
