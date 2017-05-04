@@ -3,6 +3,12 @@
 The nodejs code is located in ./app
 
 ### Building the server
+To install dependencies, run:
+
+```
+npm install
+```
+
 To transpile the es6 code, run:
 
 ```

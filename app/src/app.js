@@ -1,4 +1,5 @@
 import express from 'express';
+import bodyParser from 'body-parser';
 import cors from 'cors';
 import routes from './routes/index.js';
 const swaggerUi = require('swagger-ui-express');
@@ -10,6 +11,10 @@ app.use(cors({
   'allowedHeaders': ['Accept', 'Content-Type'],
   'methods': ['GET', 'POST', 'DELETE'],
   'origin': true
+}));
+
+app.use(bodyParser.json({
+  limit: '1mb'
 }));
 
 // API resources using defined routes
