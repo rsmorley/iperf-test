@@ -1,6 +1,17 @@
 # This REST api performs Iperf tests against a remote server (server must be running the Iperf server)
 
+### Requirements
+Node 6.9.1+
+Postgres 9.6.2+
+
 The nodejs code is located in ./app
+
+### Initialize DB 
+From the repo root, run:
+
+``` 
+psql db/iperf.sql
+```
 
 ### Building the server
 To install dependencies, run:
