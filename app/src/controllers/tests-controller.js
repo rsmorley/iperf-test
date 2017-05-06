@@ -10,8 +10,24 @@ const config = {
 let pool = new pg.Pool(config);
 
 function getTests(req, res) {
-  //TODO: return tests from db
-  return res.status(200).json({output: data});
+  pool.query(`select * from tests`,
+      (err, result) => {
+        if (err) {
+          console.error(`error retreiving tests:`, err);
+          return res.status(500).json({
+            success: false,
+            error: {
+              message: err
+            }
+          });
+        }
+        else {
+          return res.status(200).json({
+            success: true,
+            payload: _.get(result, 'rows')
+          });
+        }
+      });
 }
 
 function createTest(req, res) {
@@ -74,13 +90,52 @@ function createTest(req, res) {
 }
 
 function getTest(req, res) {
-  //TODO: get specific tests details
-  return res.status(200).json();
+  let id = req.params.testId;
+  pool.query(`select * from tests where id = $1`,
+      [id],
+      (err, result) => {
+        if (err) {
+          console.error(`error retreiving test ${testId}:`, err);
+          return res.status(500).json({
+            success: false,
+            error: {
+              message: err
+            }
+          });
+        }
+        else {
+          if (result.rows.length) {
+            return res.status(200).json({
+              success: true,
+              payload: _.get(result, 'rows[0]', {})
+            });
+          }
+          else {
+            return res.status(404).end();
+          }
+        }
+      });
 }
 
 function deleteTest(req, res) {
-  //TODO: delete specified tests
-  return res.status(204).json();
+  let id = req.params.testId;
+  pool.query(`delete from tests where id = $1`,
+      [id],
+      (err, result) => {
+        if (err) {
+          console.error(`error deleting test ${testId}:`, err);
+          return res.status(500).json({
+            success: false,
+            error: {
+              message: err
+            }
+          });
+        }
+        else {
+          //don't return 404 for non-existent tests
+          return res.status(204).end();
+        }
+      });
 }
 
 //helper functions
@@ -88,20 +143,53 @@ function runTest(testId, type, server, port) {
   let udpFlag = type === 'udp' ? '-u' : '';
   cmd.get(`iperf ${udpFlag} -c ${server} -p ${port}`, (err, data, stderr) => {
     if (!err) {
-      pool.query(`UPDATE tests SET status = $1, completed = $2 where id = $3`,
-        ['completed', new Date(), testId],
+      let rowToParse = "";
+      data.split(/\r?\n/).map((row, index, originalArray) => {
+        if (row.indexOf("Interval") > -1 || row.indexOf("Server Report") > -1) {
+          // the next for is the one we care about
+          // overwrite with Server Report data for UDP tests
+          rowToParse = _.get(originalArray, index+1, "");
+        }
+      });
+
+      let { transferred, throughput, jitter, datagrams } = parseResult(rowToParse);
+
+      pool.query(`UPDATE tests SET
+          status = $1, transferred = $2, throughput = $3, jitter = $4, datagrams = $5, completed = $6
+          where id = $7`,
+        ['completed', transferred, throughput, jitter, datagrams, new Date(), testId],
         (err, result) => {
           if (err) {
-            console.error(`error updated test ${testId}:`, err);
+            console.error(`error updating test ${testId}:`, err);
           }
         }
       );
     }
     else {
-      //TODO: add error to schema
       console.error('error running iperf command: ', err);
+      pool.query(`UPDATE tests SET status = $1, completed = $2, error = $3 where id = $4`,
+        ['failed', new Date(), err, testId],
+        (err, result) => {
+          if (err) {
+            console.error(`error updating test ${testId}:`, err);
+          }
+        }
+      );
     }
   });
+}
+
+function parseResult(result) {
+  let transferred = extractString(/(?:\S+\s)?\S*Bytes/, result);
+  let throughput = extractString(/(?:\S+\s)?\S*\/sec/, result);
+  let jitter = extractString(/(?:\S+\s)?\S*ms/, result);
+  let datagrams = extractString(/(?:\S+\s*)?\S*(?:\S+\s)?\S*%\)/, result);
+  return { transferred, throughput, jitter, datagrams };
+}
+
+function extractString(regex, stringToMatch) {
+  let match = stringToMatch.match(regex);
+  return _.get(match, 0, null);
 }
 
 module.exports = {
