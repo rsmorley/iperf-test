@@ -4,16 +4,19 @@
   "description": "REST api to perform Iperf tests against a remote server",
   "main": "es5/app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "build": "./node_modules/.bin/babel src -d es5 --presets env",
-    "start": "node es5/server.js"
+    "start": "node es5/server.js",
+    "test": "node tests/index.js"
   },
   "author": "R. Scott Morley",
   "license": "ISC",
   "devDependencies": {
     "babel-cli": "^6.24.1",
     "babel-polyfill": "^6.23.0",
-    "babel-preset-env": "^1.4.0"
+    "babel-preset-env": "^1.4.0",
+    "sinon": "^2.2.0",
+    "supertest": "^3.0.0",
+    "tape": "^4.6.3"
   },
   "dependencies": {
     "body-parser": "^1.17.1",

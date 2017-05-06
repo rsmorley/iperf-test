@@ -1,33 +1,27 @@
 import cmd from 'node-cmd';
-import pg from 'pg';
 import validator from 'validator';
 import _ from 'lodash';
 
-const config = {
-  database: 'iperftests'
-}
-
-let pool = new pg.Pool(config);
+import db from '../db.js';
 
 function getTests(req, res) {
-  pool.query(`select * from tests`,
-      (err, result) => {
-        if (err) {
-          console.error(`error retreiving tests:`, err);
-          return res.status(500).json({
-            success: false,
-            error: {
-              message: err
-            }
-          });
-        }
-        else {
-          return res.status(200).json({
-            success: true,
-            payload: _.get(result, 'rows')
-          });
+  db.getTests((err, result) => {
+    if (err) {
+      console.error(`error retreiving tests:`, err);
+      return res.status(500).json({
+        success: false,
+        error: {
+          message: err
         }
       });
+    }
+    else {
+      return res.status(200).json({
+        success: true,
+        payload: _.get(result, 'rows')
+      });
+    }
+  });
 }
 
 function createTest(req, res) {
@@ -64,8 +58,7 @@ function createTest(req, res) {
       });
   }
 
-  pool.query(`INSERT INTO tests (status, server, port, type) VALUES ($1, $2, $3, $4) RETURNING id`,
-    ['running', server, port, type],
+  db.createTest(server, port, type,
     (err, result) => {
       if (err) {
         return res.status(500).json({
@@ -91,51 +84,49 @@ function createTest(req, res) {
 
 function getTest(req, res) {
   let id = req.params.testId;
-  pool.query(`select * from tests where id = $1`,
-      [id],
-      (err, result) => {
-        if (err) {
-          console.error(`error retreiving test ${testId}:`, err);
-          return res.status(500).json({
-            success: false,
-            error: {
-              message: err
-            }
+  db.getTest(id,
+    (err, result) => {
+      if (err) {
+        console.error(`error retreiving test ${id}:`, err);
+        return res.status(500).json({
+          success: false,
+          error: {
+            message: err
+          }
+        });
+      }
+      else {
+        if (result.rows.length) {
+          return res.status(200).json({
+            success: true,
+            payload: _.get(result, 'rows[0]', {})
           });
         }
         else {
-          if (result.rows.length) {
-            return res.status(200).json({
-              success: true,
-              payload: _.get(result, 'rows[0]', {})
-            });
-          }
-          else {
-            return res.status(404).end();
-          }
+          return res.status(404).end();
         }
-      });
+      }
+    });
 }
 
 function deleteTest(req, res) {
   let id = req.params.testId;
-  pool.query(`delete from tests where id = $1`,
-      [id],
-      (err, result) => {
-        if (err) {
-          console.error(`error deleting test ${testId}:`, err);
-          return res.status(500).json({
-            success: false,
-            error: {
-              message: err
-            }
-          });
-        }
-        else {
-          //don't return 404 for non-existent tests
-          return res.status(204).end();
-        }
-      });
+  db.deleteTest(id,
+    (err, result) => {
+      if (err) {
+        console.error(`error deleting test ${testId}:`, err);
+        return res.status(500).json({
+          success: false,
+          error: {
+            message: err
+          }
+        });
+      }
+      else {
+        //don't return 404 for non-existent tests
+        return res.status(204).end();
+      }
+    });
 }
 
 //helper functions
@@ -154,10 +145,7 @@ function runTest(testId, type, server, port) {
 
       let { transferred, throughput, jitter, datagrams } = parseResult(rowToParse);
 
-      pool.query(`UPDATE tests SET
-          status = $1, transferred = $2, throughput = $3, jitter = $4, datagrams = $5, completed = $6
-          where id = $7`,
-        ['completed', transferred, throughput, jitter, datagrams, new Date(), testId],
+      db.updateTest(testId, 'completed', transferred, throughput, jitter, datagrams,
         (err, result) => {
           if (err) {
             console.error(`error updating test ${testId}:`, err);
@@ -167,8 +155,7 @@ function runTest(testId, type, server, port) {
     }
     else {
       console.error('error running iperf command: ', err);
-      pool.query(`UPDATE tests SET status = $1, completed = $2, error = $3 where id = $4`,
-        ['failed', new Date(), err, testId],
+      db.updateTest(testId, 'failed', null, null, null, null,
         (err, result) => {
           if (err) {
             console.error(`error updating test ${testId}:`, err);
