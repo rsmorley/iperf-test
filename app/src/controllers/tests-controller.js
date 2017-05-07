@@ -130,38 +130,7 @@ function deleteTest(req, res) {
 //helper functions
 function runTest(testId, type, server, port) {
   let udpFlag = type === 'udp' ? '-u' : '';
-  cmd.get(`iperf ${udpFlag} -c ${server} -p ${port}`, (err, data, stderr) => {
-    if (!err) {
-      let rowToParse = "";
-      data.split(/\r?\n/).map((row, index, originalArray) => {
-        if (row.indexOf("Interval") > -1 || row.indexOf("Server Report") > -1) {
-          // the next for is the one we care about
-          // overwrite with Server Report data for UDP tests
-          rowToParse = _.get(originalArray, index+1, "");
-        }
-      });
-
-      let { transferred, throughput, jitter, datagrams } = parseResult(rowToParse);
-
-      db.updateTest(testId, 'completed', transferred, throughput, jitter, datagrams,
-        (err, result) => {
-          if (err) {
-            console.error(`error updating test ${testId}:`, err);
-          }
-        }
-      );
-    }
-    else {
-      console.error('error running iperf command: ', err);
-      db.updateTest(testId, 'failed', null, null, null, null,
-        (err, result) => {
-          if (err) {
-            console.error(`error updating test ${testId}:`, err);
-          }
-        }
-      );
-    }
-  });
+  cmd.get(`iperf ${udpFlag} -c ${server} -p ${port}`, cmdCallback.bind(this, testId));
 }
 
 function parseResult(result) {
@@ -175,6 +144,40 @@ function parseResult(result) {
 function extractString(regex, stringToMatch) {
   let match = stringToMatch.match(regex);
   return _.get(match, 0, null);
+}
+
+// extract callback for better testability
+function cmdCallback(testId, err, data, stderr) {
+  if (!err) {
+    let rowToParse = "";
+    data.split(/\r?\n/).map((row, index, originalArray) => {
+      if (row.indexOf("Interval") > -1 || row.indexOf("Server Report") > -1) {
+        // the next for is the one we care about
+        // overwrite with Server Report data for UDP tests
+        rowToParse = _.get(originalArray, index+1, "");
+      }
+    });
+
+    let { transferred, throughput, jitter, datagrams } = parseResult(rowToParse);
+
+    db.updateTest(testId, 'completed', transferred, throughput, jitter, datagrams,
+        (err, result) => {
+          if (err) {
+            console.error(`error updating test ${testId}:`, err);
+          }
+        }
+        );
+  }
+  else {
+    console.error('error running iperf command: ', err);
+    db.updateTest(testId, 'failed', null, null, null, null,
+        (err, result) => {
+          if (err) {
+            console.error(`error updating test ${testId}:`, err);
+          }
+        }
+        );
+  }
 }
 
 module.exports = {

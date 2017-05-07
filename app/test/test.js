@@ -167,7 +167,7 @@ describe('POST /tests', function() {
       });
   });
 
-  it('calls db update after command successfully completes', function (done) {
+  it('calls db to mark completed on success', function (done) {
     var dbCreateTestStub = sinon.stub(db, 'createTest');
     dbCreateTestStub.yields(null, { rows: [ { id: 42 } ] });
 
@@ -181,6 +181,7 @@ describe('POST /tests', function() {
       [ ID] Interval       Transfer     Bandwidth
       [  4]  0.0-10.0 sec  88.0 MBytes  73.8 Mbits/sec`;
     var cmdStub = sinon.stub(cmd, 'get');
+    cmdStub.callsArgWith(1, null, cmdOuput, null);
 
     request(app)
       .post('/tests')
@@ -191,7 +192,36 @@ describe('POST /tests', function() {
       .expect('Content-Type', /json/)
       .expect(201)
       .end(function (err, res) {
-        assert.equal(true, cmdStub.called);
+        assert.equal(true, cmdStub.called, 'cmd');
+        assert.equal(true, dbUpdateTestStub.calledWith(42, "completed"), 'updateTest');
+        if (err) return done(err); //expects that fail don't throw
+        done();
+        db.createTest.restore();
+        db.updateTest.restore();
+        cmd.get.restore();
+      });
+  });
+
+  it('calls db to mark failed on failure', function (done) {
+    var dbCreateTestStub = sinon.stub(db, 'createTest');
+    dbCreateTestStub.yields(null, { rows: [ { id: 42 } ] });
+
+    var dbUpdateTestStub = sinon.stub(db, 'updateTest');
+
+    var cmdStub = sinon.stub(cmd, 'get');
+    cmdStub.callsArgWith(1, "some error", null, null);
+
+    request(app)
+      .post('/tests')
+      .send({ type: 'tcp',
+        server: '192.168.110.168',
+        port: 5001
+      })
+      .expect('Content-Type', /json/)
+      .expect(201)
+      .end(function (err, res) {
+        assert.equal(true, cmdStub.called, 'cmd');
+        assert.equal(true, dbUpdateTestStub.calledWith(42, "failed"), 'updateTest');
         if (err) return done(err); //expects that fail don't throw
         done();
         db.createTest.restore();
@@ -264,6 +294,38 @@ describe('GET /tests/:id', function() {
         if (err) return done(err); //expects that fail don't throw
         done();
         db.getTest.restore();
+      });
+  });
+
+});
+
+describe('DELETE /tests/:id', function() {
+  it('responds with 204 valid reqeust', function(done) {
+    var dbDeleteTestStub = sinon.stub(db, 'deleteTest');
+    dbDeleteTestStub.yields(null, {});
+
+    request(app)
+      .delete('/tests/42')
+      .expect(204)
+      .end(function (err, res) {
+        if (err) return done(err); //expects that fail don't throw
+        done();
+        db.deleteTest.restore();
+      });
+  });
+
+  it('responds with a 500 and error payload on db error', function(done) {
+    var dbDeleteTestStub = sinon.stub(db, 'deleteTest');
+    var errorText = 'some db error';
+    dbDeleteTestStub.yields(errorText, {});
+
+    request(app)
+      .delete('/tests/42')
+      .expect(500)
+      .end(function (err, res) {
+        if (err) return done(err); //expects that fail don't throw
+        done();
+        db.deleteTest.restore();
       });
   });
 

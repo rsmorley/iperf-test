@@ -6,7 +6,7 @@
   "scripts": {
     "build": "./node_modules/.bin/babel src -d es5 --presets env",
     "start": "node es5/server.js",
-    "test": "./node_modules/.bin/mocha"
+    "test": "npm run build && ./node_modules/.bin/mocha"
   },
   "author": "R. Scott Morley",
   "license": "ISC",
