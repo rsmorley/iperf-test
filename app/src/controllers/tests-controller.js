@@ -30,20 +30,17 @@ function createTest(req, res) {
   let minPort = 0;
   let maxPort = 65535;
 
-  //TODO: test coverage
   let type = _.get(req.body, 'type', 'tcp');
   if (_.indexOf(validTypes, type) < 0) {
     argErr = `type ${type} not in valid types: ${validTypes}; `;
   }
 
-  //TODO: test coverage
   let server = _.get(req.body, 'server');
   if(!server || !validator.isIP(server)) {
     argErr += `ipaddress ${server} is not a valid ipv4 or ipv6 address; `;
   }
 
   let port = _.get(req.body, 'port', 5001);
-  //TODO: test edge cases
   if (!_.inRange(port, minPort, maxPort + 1)) {
     argErr += `port ${port} not in allowable range: ${minPort} - ${maxPort}; `;
   }
@@ -61,6 +58,7 @@ function createTest(req, res) {
   db.createTest(server, port, type,
     (err, result) => {
       if (err) {
+        console.error(`error creating test:`, err);
         return res.status(500).json({
           success: false,
           error: {
