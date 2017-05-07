@@ -230,6 +230,8 @@ describe('POST /tests', function() {
       });
   });
 
+  // TODO: add tests for cmd ouput parsing
+
 });
 
 describe('GET /tests/:id', function() {

@@ -46,3 +46,8 @@ To view the Swagger UI interface:
 open http://localhost:8080/docs
 ```
 
+### Running test
+
+```
+npm test
+```
