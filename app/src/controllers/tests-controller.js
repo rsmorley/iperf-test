@@ -130,7 +130,9 @@ function deleteTest(req, res) {
 //helper functions
 function runTest(testId, type, server, port) {
   let udpFlag = type === 'udp' ? '-u' : '';
-  cmd.get(`iperf ${udpFlag} -c ${server} -p ${port}`, cmdCallback.bind(this, testId));
+  cmd.get(`iperf ${udpFlag} -c ${server} -p ${port}`,
+      (err, data, stderr) => { cmdCallback(testId, err, data, stderr); }
+  );
 }
 
 function parseResult(result) {
